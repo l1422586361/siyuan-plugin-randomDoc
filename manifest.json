@@ -1,7 +1,7 @@
 {
-    "name": "样例插件",
-    "description": "这是一个样例插件",
-    "author": "zuoez02",
-    "url": "https://github.com/zuoez02/siyuan-plugin-sample",
+    "name": "漫游文档",
+    "description": "温故而知新",
+    "author": "l1422586361",
+    "url": "https://github.com/l1422586361/siyuan-plugin-randomDoc.git",
     "version": "1.0.0"
 }
