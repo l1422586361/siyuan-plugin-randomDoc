@@ -201,7 +201,7 @@ async function toggleBtnSub(str = "") {
       grade = -1;
     }
     // console.log(grade)
-    await fsrs({ id: 当前打开文档.id }, grade, globalData).then(async (e) => {
+    await fsrs(card, grade, globalData).then(async (e) => {
       console.log("e==========", e);
       data.cardData = await 更新卡片(data.cardData, 当前打开文档.id, e.cardData);
       console.log(data.cardData);
