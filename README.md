@@ -10,3 +10,10 @@ siyuan笔记插件-文档漫游+
 
 - npm i 
 - npm run dev/build
+
+
+## 数据文件\data\widgets\randomNote\data.json初始值
+
+```json
+{"cardData":[]}
+```
