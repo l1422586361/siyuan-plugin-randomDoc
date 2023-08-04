@@ -10,4 +10,3 @@ siyuan笔记插件-文档漫游+
 
 - npm i 
 - npm run dev/build
-- cp -r dist /pathtosiyuan/data/widgets/widget-graph
