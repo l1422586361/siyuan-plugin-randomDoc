@@ -11,7 +11,8 @@
   "dependencies": {
     "@antv/g6": "^4.8.0",
     "element-plus": "^2.2.27",
-    "vue": "^3.2.45"
+    "vue": "^3.2.45",
+    "vue-clipboard3": "^2.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.0.0",

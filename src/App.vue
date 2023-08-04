@@ -5,6 +5,9 @@ import { 获取配置, 写入配置 } from "./data/writeConfig.js";
 import { 获取数据, 写入数据, 移除卡片, 卡片排序, 更新卡片 } from "./data/cardData.js";
 import { sql, setBlockAttrs, getBlockByID } from "./utils/api.js";
 import siyuanTools from './js/siyuanTools.js'
+import { Share } from '@element-plus/icons-vue'
+// import { getCurrentInstance } from "vue";
+import useClipboard from "vue-clipboard3"
 
 // 数据============================================start
 let conf = {};
@@ -14,6 +17,7 @@ const 按钮状态 = reactive({
   show复习子按钮: false,
   show新材料按钮: false,
   禁用删除按钮: true,
+  加入复习子按钮: false,
 });
 
 const 文本框配置 = reactive({
@@ -34,6 +38,11 @@ const 统计数值 = reactive({
   ignore: 0,
 });
 
+const 信息栏 = reactive({
+  次数: "-",
+  上次查看时间: "--",
+})
+
 const globalData = null;
 const 延期天数 = ref(7)
 const 延期按钮状态 = reactive({
@@ -44,7 +53,7 @@ const 延期按钮状态 = reactive({
 
 // 方法===========================================start
 
-function jumpToNote(note_id){
+function jumpToNote(note_id) {
   siyuanTools.VirtualOpen(note_id);
 }
 
@@ -87,11 +96,21 @@ async function tongji() {
   });
 }
 
+function 重置信息栏(){
+  信息栏.次数 = "-";
+  信息栏.上次查看时间 = "--";
+}
+
 async function toggleBtn(str = "") {
   if (str == "fuxi") {
-    按钮状态.禁用复习 = true;
-    按钮状态.show复习子按钮 = true;
-    按钮状态.show新材料按钮 = false;
+    按钮状态.加入复习子按钮 = false;
+    console.log("data==========",data)
+
+
+
+    // 按钮状态.禁用复习 = true;
+    // 按钮状态.show复习子按钮 = true;
+    // 按钮状态.show新材料按钮 = false;
     data.cardData = await 卡片排序(data.cardData);
     console.log(data.cardData);
     for (let card of data.cardData) {
@@ -106,11 +125,22 @@ async function toggleBtn(str = "") {
         });
         // window.open("siyuan://blocks/" + 当前打开文档.id);
         jumpToNote(当前打开文档.id)
+        
+        await fsrs(card, 2, globalData).then(async (e) => {
+          // console.log("1111e==========", e);
+          data.cardData = await 更新卡片(data.cardData, 当前打开文档.id, e.cardData);
+          信息栏.次数 = e.cardData.reps
+          console.log(e.cardData.history)
+          信息栏.上次查看时间 = e.cardData.history.at(-1).review.substring(0,10)
+          // console.log(data.cardData);
+          写入数据(data);
+        });
         break;
       } else {
         当前打开文档.name = "当前已完成复习！";
         按钮状态.show复习子按钮 = false;
         按钮状态.禁用复习 = true;
+        重置信息栏()
         break;
       }
     }
@@ -128,8 +158,13 @@ async function toggleBtn(str = "") {
     文本框配置.输入文本 = 文本框配置.显示文本;
   }
   if (str == "newCard") {
-    按钮状态.show新材料按钮 = true;
-    按钮状态.show复习子按钮 = false;
+    // 按钮状态.show新材料按钮 = true;
+    按钮状态.加入复习子按钮 = true;
+    重置信息栏();
+
+
+
+
     按钮状态.禁用复习 = false;
     await sql(conf.sql).then(async (e) => {
       await getBlockByID(e[0].root_id).then((e) => {
@@ -141,14 +176,27 @@ async function toggleBtn(str = "") {
     // window.open("siyuan://blocks/" + 当前打开文档.id);
     jumpToNote(当前打开文档.id)
     // console.log(newCard[0].root_id)
-    await fsrs({ id: 当前打开文档.id }, -1, globalData).then((e) => {
-      data.cardData.push(e.cardData);
-    });
+    // await fsrs({ id: 当前打开文档.id }, -1, globalData).then((e) => {
+    //   data.cardData.push(e.cardData);
+    // });
     // // 设定属性为已写入队列
-    await setBlockAttrs(当前打开文档.id, { "custom-randomNoteType": "queue" });
+   
     统计数值.队列总数 += 1;
     // console.log(data)
-    写入数据(data);
+    // 写入数据(data);
+  }
+  if (str == "joinFuxi") {
+
+    console.log("2===========",当前打开文档)
+
+    // 写入数据信息
+    await fsrs({ id: 当前打开文档.id }, -1, globalData).then((e) => {
+      console.log("3========",e)
+      data.cardData.push(e.cardData);
+    });
+     await setBlockAttrs(当前打开文档.id, { "custom-randomNoteType": "queue" });
+    按钮状态.加入复习子按钮 = false;
+    写入数据(data)
   }
 
   if (str == "delCard") {
@@ -158,24 +206,52 @@ async function toggleBtn(str = "") {
     当前打开文档.id = "";
     当前打开文档.name = "未打开文档";
   }
+
+  if (str == "ignoreCard"){
+    // 忽略卡片并删除卡片数据
+    await setBlockAttrs(当前打开文档.id, { "custom-randomNoteType": "ignore" });
+    data.cardData = await 移除卡片(data.cardData, 当前打开文档.id);
+    统计数值.队列总数 += 1;
+    写入数据(data);
+    // 按钮状态.show新材料按钮 = false
+    当前打开文档.id = "";
+    当前打开文档.name = "未打开文档";
+  }
+
+  if(str == "copyLink"){
+
+    // 复制链接
+    const {toClipboard} = useClipboard()
+    // await useClipboard()(text)
+    const copy = async(Val) =>{
+      try{
+        await toClipboard(Val)
+        console.log("复制成功")
+      }catch(e){
+        console.log(e)
+      }
+    }
+    copy('siyuan://'+当前打开文档.id)
+  }
+
 }
 
-async function toggleBtnYanQi(str=""){
-  if(str=="yanqi"){
+async function toggleBtnYanQi(str = "") {
+  if (str == "yanqi") {
     延期按钮状态.显示表单 = true
     延期按钮状态.禁用延期按钮 = true
   }
-  if(str=="canal"){
+  if (str == "canal") {
     延期按钮状态.显示表单 = false
     延期按钮状态.禁用延期按钮 = false
   }
-  if(str=="save"){
-    for(let card of data.cardData){
-      if(card.id == 当前打开文档.id){
+  if (str == "save") {
+    for (let card of data.cardData) {
+      if (card.id == 当前打开文档.id) {
         let date = new Date()
         date = date.setDate(date.getDate() + 延期天数.value)
         card.due = new Date(date).toISOString()
-        更新卡片(data.cardData,当前打开文档.id,card)
+        更新卡片(data.cardData, 当前打开文档.id, card)
       }
     }
     写入数据(data)
@@ -183,7 +259,7 @@ async function toggleBtnYanQi(str=""){
     延期按钮状态.禁用延期按钮 = false
     当前打开文档.id = "";
     当前打开文档.name = "未打开文档";
-  } 
+  }
 }
 
 async function toggleBtnSub(str = "") {
@@ -275,35 +351,41 @@ watch(
 </script>
 
 <template>
-  <el-aside width="400px">
-    <el-input
-      v-model="文本框配置.输入文本"
-      type="textarea"
-      resize="none"
-      class="w-50 m-2 el-input"
-      :disabled="文本框配置.禁用状态"
-      :placeholder="文本框配置.显示文本"
-    />
+  <el-aside width="500px">
+    <!-- 文本框输入：设置，暂时只有筛选的sql -->
+    <el-input v-model="文本框配置.输入文本" type="textarea" resize="none" class="w-50 m-2 el-input" :disabled="文本框配置.禁用状态"
+      :placeholder="文本框配置.显示文本" />
+    <!-- 信息栏：显示当前文档名称，可复制当前文档链接，显示文档的上次时间和查看次数 -->
     <el-row :gutter="20">
-      <el-col :span="12" :title="当前打开文档.name" :size="small">当前：{{ 当前打开文档.name.substring(0,10) }}</el-col>
-      <el-col :span="12" class="tongji" title="待复习/已复习/队列总数/ignore">{{ 统计数值.待复习 }}/{{ 统计数值.已复习 }}/{{ 统计数值.队列总数 }}/{{
+      <el-col :span="14" :title="当前打开文档.name" :size="small">当前：{{ 当前打开文档.name.substring(0, 15) }}&nbsp;<el-button :span="1"
+          type="default" :icon="Share" size="small" @click="toggleBtn('copyLink')"></el-button></el-col>
+
+
+      <!-- <el-col :span="12" class="tongji" title="待复习/已复习/队列总数/ignore">{{ 统计数值.待复习 }}/{{ 统计数值.已复习 }}/{{ 统计数值.队列总数 }}/{{
           统计数值.ignore
         }}</el-col
-      >
+      > -->
+      <el-col :span="10" class="tongji" title="查看次数/上次查看时间">{{ 信息栏.次数 }}/{{ 信息栏.上次查看时间 }}</el-col>
     </el-row>
+    <!-- 按钮区：新材料，加入复习队列,复习，忽略此材料，设置 -->
     <el-row>
       <el-button-group>
-        <el-button type="primary" :disabled="按钮状态.禁用复习" @click="toggleBtn('fuxi')">复习</el-button>
         <el-button type="default" @click="toggleBtn('newCard')">新材料</el-button>
-        <el-button type="default" @click="toggleBtn('delCard')" :disabled="按钮状态.禁用删除按钮">删除此记录</el-button>
-        
+        <el-button type="default" v-if="按钮状态.加入复习子按钮" @click="toggleBtn('joinFuxi')">加入复习队列</el-button>
+        <el-button type="default" @click="toggleBtn('fuxi')" :disabled="按钮状态.禁用复习">复习</el-button>
+        <el-button type="default" @click="toggleBtn('ignoreCard')">忽略此材料</el-button>
+
+
+        <!-- <el-button type="primary" :disabled="按钮状态.禁用复习" @click="toggleBtn('fuxi')">复习</el-button> -->
+        <!-- <el-button type="default" @click="toggleBtn('delCard')" :disabled="按钮状态.禁用删除按钮">删除此记录</el-button> -->
+
         <el-button type="default" v-if="文本框配置.禁用状态" @click="toggleBtn('setting')">设置</el-button>
         <!-- <el-button @click="test">测试</el-button> -->
         <el-button type="default" v-if="!文本框配置.禁用状态" @click="toggleBtn('save')">保存</el-button>
         <el-button type="default" v-if="!文本框配置.禁用状态" @click="toggleBtn('quxiao')">取消</el-button>
       </el-button-group>
     </el-row>
-    <el-row>
+    <!-- <el-row>
       <el-button-group v-if="按钮状态.show复习子按钮" size="small">
         <el-button @click="toggleBtnSub('wangji')">忘记</el-button>
         <el-button @click="toggleBtnSub('jizhu')">记住</el-button>
@@ -318,7 +400,7 @@ watch(
       </el-button-group>
 
       
-    </el-row>
+    </el-row> -->
     <el-row>
       <el-form :inline="true" size="small" v-if="延期按钮状态.显示表单">
         <el-form-item>
@@ -328,7 +410,7 @@ watch(
           <el-button @click="toggleBtnYanQi('save')">确定</el-button>
           <el-button @click="toggleBtnYanQi('canal')">取消</el-button>
         </el-form-item>
-        
+
       </el-form>
     </el-row>
   </el-aside>
@@ -339,10 +421,12 @@ watch(
   height: 200px;
   margin-bottom: 5px;
 }
+
 .el-aside {
   overflow: hidden;
   background: white;
 }
+
 .tongji {
   text-align: right;
   margin-bottom: 5px;
