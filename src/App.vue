@@ -231,7 +231,7 @@ async function toggleBtn(str = "") {
         console.log(e)
       }
     }
-    copy('siyuan://'+当前打开文档.id)
+    copy('siyuan://'+当前打开文档.id+" | "+当前打开文档.name)
   }
 
 }
